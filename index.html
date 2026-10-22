@@ -1,0 +1,168 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini LOL</title>
+<style>
+body {
+  margin: 0;
+  background: #17251e;
+  color: white;
+  font-family: sans-serif;
+  text-align: center;
+}
+h2 { color: #e8c66a; }
+canvas {
+  background: #376b45;
+  border: 3px solid #c6a85b;
+  max-width: 95%;
+  touch-action: none;
+}
+p { font-size: 13px; }
+</style>
+</head>
+<body>
+<h2>MINI LOL</h2>
+<p>WASD 이동 · 마우스 클릭 공격 · R 재시작</p>
+<canvas id="game" width="700" height="430"></canvas>
+<p id="info">적을 모두 처치해 봐!</p>
+
+<script>
+const c = document.getElementById("game");
+const ctx = c.getContext("2d");
+const info = document.getElementById("info");
+const keys = {};
+let player, enemies, shots, kills, over;
+
+function reset() {
+  player = {x:350,y:215,hp:100};
+  enemies = [];
+  shots = [];
+  kills = 0;
+  over = false;
+  for(let i=0;i<5;i++) {
+    enemies.push({
+      x:50+Math.random()*600,
+      y:40+Math.random()*350,
+      hp:3
+    });
+  }
+}
+reset();
+
+document.addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+  if(e.key.toLowerCase()==="r") reset();
+});
+document.addEventListener("keyup", e => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+c.addEventListener("click", e => {
+  if(over) return;
+  const rect = c.getBoundingClientRect();
+  const mx = (e.clientX-rect.left)*c.width/rect.width;
+  const my = (e.clientY-rect.top)*c.height/rect.height;
+  const dx = mx-player.x, dy = my-player.y;
+  const len = Math.hypot(dx,dy)||1;
+  shots.push({
+    x:player.x,y:player.y,
+    vx:dx/len*7,vy:dy/len*7
+  });
+});
+
+function draw() {
+  ctx.clearRect(0,0,c.width,c.height);
+
+  // 풀밭
+  ctx.strokeStyle="#477c50";
+  for(let x=0;x<700;x+=35) {
+    ctx.beginPath();ctx.moveTo(x,0);
+    ctx.lineTo(x,430);ctx.stroke();
+  }
+  for(let y=0;y<430;y+=35) {
+    ctx.beginPath();ctx.moveTo(0,y);
+    ctx.lineTo(700,y);ctx.stroke();
+  }
+
+  // 플레이어 이동
+  if(!over) {
+    if(keys.w || keys.arrowup) player.y-=3;
+    if(keys.s || keys.arrowdown) player.y+=3;
+    if(keys.a || keys.arrowleft) player.x-=3;
+    if(keys.d || keys.arrowright) player.x+=3;
+  }
+  player.x=Math.max(12,Math.min(688,player.x));
+  player.y=Math.max(12,Math.min(418,player.y));
+
+  // 플레이어
+  ctx.fillStyle="#4ac8ff";
+  ctx.beginPath();
+  ctx.arc(player.x,player.y,13,0,Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle="white";
+  ctx.fillRect(player.x-18,player.y-24,36,5);
+  ctx.fillStyle="#47ee75";
+  ctx.fillRect(player.x-18,player.y-24,36*player.hp/100,5);
+
+  // 적 이동 및 체력
+  enemies.forEach((e,i) => {
+    if(!over) {
+      const dx=player.x-e.x, dy=player.y-e.y;
+      const d=Math.hypot(dx,dy)||1;
+      e.x+=dx/d*0.65;
+      e.y+=dy/d*0.65;
+      if(d<24) player.hp-=0.12;
+    }
+    ctx.fillStyle="#f34e59";
+    ctx.beginPath();
+    ctx.arc(e.x,e.y,13,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle="white";
+    ctx.fillRect(e.x-13,e.y-21,26,4);
+    ctx.fillStyle="#ffdc57";
+    ctx.fillRect(e.x-13,e.y-21,26*e.hp/3,4);
+  });
+
+  // 투사체
+  shots.forEach(s => {
+    s.x+=s.vx;s.y+=s.vy;
+    ctx.fillStyle="#ffe878";
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,5,0,Math.PI*2);
+    ctx.fill();
+
+    enemies.forEach(e => {
+      if(Math.hypot(s.x-e.x,s.y-e.y)<17 && !s.hit) {
+        e.hp--;
+        s.hit=true;
+      }
+    });
+  });
+
+  shots=shots.filter(s =>
+    !s.hit && s.x>=0 && s.x<=700 && s.y>=0 && s.y<=430
+  );
+  enemies=enemies.filter(e=>e.hp>0);
+  kills=5-enemies.length;
+
+  info.textContent=
+    "처치: "+kills+"/5 | 체력: "+Math.max(0,Math.ceil(player.hp));
+
+  if(player.hp<=0) {
+    over=true;
+    info.textContent="패배! R 키로 다시 시작";
+  }
+  if(enemies.length===0) {
+    over=true;
+    info.textContent="승리! 모든 적 처치 성공! R 키로 재시작";
+  }
+
+  requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body>
+</html>
